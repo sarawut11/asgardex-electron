@@ -1,9 +1,6 @@
 import React, { createContext, useContext } from 'react'
 
-import { useSubscription } from 'observable-hooks'
-
-import { client$, setNetworkState, address$ } from '../services/ethereum/service'
-import { useAppContext } from './AppContext'
+import { client$, address$ } from '../services/ethereum/service'
 
 export type EthereumContextValue = {
   client$: typeof client$
@@ -22,8 +19,6 @@ type Props = {
 }
 
 export const EthereumProvider: React.FC<Props> = ({ children }: Props): JSX.Element => {
-  const { network$ } = useAppContext()
-  useSubscription(network$, (network) => setNetworkState(network))
   return <EthereumContext.Provider value={initialContext}>{children}</EthereumContext.Provider>
 }
 
