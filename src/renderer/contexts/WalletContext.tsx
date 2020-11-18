@@ -1,5 +1,7 @@
 import React, { createContext, useContext } from 'react'
 
+import { Events, Keyring } from '@shapeshiftoss/hdwallet-core'
+import { WebUSBLedgerAdapter } from '@shapeshiftoss/hdwallet-ledger-webusb'
 import * as O from 'fp-ts/lib/Option'
 import { none, Option, some } from 'fp-ts/lib/Option'
 
@@ -17,6 +19,46 @@ import {
   resetTxsPage
 } from '../services/wallet/context'
 
+let hdWallet
+
+const initializeHDWallet = async () => {
+  const keyring = new Keyring()
+  const ledgerAdapter = WebUSBLedgerAdapter.useKeyring(keyring)
+
+  keyring.on(['*', '*', Events.CONNECT], async (deviceId) => {
+    hdWallet = keyring.get(deviceId)
+  })
+
+  try {
+    await ledgerAdapter.initialize()
+  } catch (e) {
+    console.error('Could not initialize LedgerAdapter', e)
+  }
+
+  for (const [deviceID] of Object.entries(keyring.wallets)) {
+    hdWallet = keyring.get(deviceID)
+  }
+
+  hdWallet = keyring.get()
+  if (hdWallet) {
+    if (hdWallet.transport) {
+      await hdWallet.transport.connect()
+    }
+    // Initializing a native wallet will immediately prompt for the mnemonic
+    if ((await hdWallet.getModel()) !== 'Native') {
+      await hdWallet.initialize()
+    }
+  } else {
+    try {
+      hdWallet = await ledgerAdapter.pairDevice()
+    } catch (e) {
+      console.log('initializeHDWallet > ', e)
+    }
+  }
+}
+
+initializeHDWallet()
+
 type WalletContextValue = {
   keystoreService: typeof keystoreService
   reloadBalances: typeof reloadBalances
@@ -29,6 +71,7 @@ type WalletContextValue = {
   txs$: typeof txs$
   setSelectedAsset: typeof setSelectedAsset
   resetTxsPage: typeof resetTxsPage
+  hdWallet: typeof hdWallet
 }
 
 const initialContext: WalletContextValue = {
@@ -42,7 +85,8 @@ const initialContext: WalletContextValue = {
   selectedAsset$,
   txs$,
   setSelectedAsset,
-  resetTxsPage
+  resetTxsPage,
+  hdWallet
 }
 const WalletContext = createContext<Option<WalletContextValue>>(none)
 

@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo } from 'react'
 
 import { StopOutlined } from '@ant-design/icons'
+import { supportsBTC, BTCInputScriptType } from '@shapeshiftoss/hdwallet-core'
 import { Row, Col, Button, List, Dropdown } from 'antd'
 import { MenuProps } from 'antd/lib/menu'
 import * as O from 'fp-ts/lib/Option'
@@ -9,6 +10,7 @@ import { useIntl } from 'react-intl'
 
 import { ReactComponent as DownIcon } from '../../../assets/svg/icon-down.svg'
 import { ReactComponent as UnlockOutlined } from '../../../assets/svg/icon-unlock-warning.svg'
+import { useWalletContext } from '../../../contexts/WalletContext'
 import { Network } from '../../../services/app/types'
 import { AVAILABLE_NETWORKS } from '../../../services/const'
 import { UserAccountType } from '../../../types/wallet'
@@ -26,6 +28,7 @@ type Props = {
 
 export const Settings: React.FC<Props> = (props): JSX.Element => {
   const intl = useIntl()
+  const { hdWallet } = useWalletContext()
   const {
     apiVersion = '',
     clientUrl,
@@ -39,6 +42,32 @@ export const Settings: React.FC<Props> = (props): JSX.Element => {
   const removeWallet = useCallback(() => {
     removeKeystore()
   }, [removeKeystore])
+
+  const addDevice = useCallback(
+    async (chainName: string) => {
+      console.log(chainName)
+      if (!hdWallet) {
+        console.log('addDevice > ', 'No wallet?')
+        return
+      }
+      const wallet: any = hdWallet
+      if (supportsBTC(wallet)) {
+        //coin 0 (mainnet bitcoin)
+        //path 0
+        const res = await wallet.btcGetAddress({
+          addressNList: [0x80000000 + 44, 0x80000000 + 0, 0x80000000 + 0, 0, 0],
+          coin: 'Bitcoin',
+          scriptType: BTCInputScriptType.SpendAddress,
+          showDisplay: true
+        })
+        console.log('addDevice > ', res)
+      } else {
+        const label = await wallet.getLabel()
+        console.log('addDevice > ', label + ' does not support BTC')
+      }
+    },
+    [hdWallet]
+  )
 
   const accounts = useMemo(
     () =>
@@ -66,6 +95,7 @@ export const Settings: React.FC<Props> = (props): JSX.Element => {
                         </Styled.AccountContent>
                       </Styled.ChainContent>
                     ))}
+                    <Button onClick={() => addDevice(item.chainName)}>ADD DEVICE</Button>
                   </Styled.ListItem>
                 )}
               />
@@ -74,7 +104,7 @@ export const Settings: React.FC<Props> = (props): JSX.Element => {
         )),
         O.getOrElse(() => <></>)
       ),
-    [intl, userAccounts]
+    [addDevice, intl, userAccounts]
   )
 
   const changeNetworkHandler: MenuProps['onClick'] = useCallback(
